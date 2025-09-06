@@ -39,10 +39,6 @@ const EventModal: React.FC<EventModalProps> = ({ eventData, onClose, onSave, onD
   const startId = useId();
   const endId = useId();
   const descriptionId = useId();
-  const capacityId = useId();
-  const totalId = useId();
-  const waitingId = useId();
-  const priceId = useId();
 
   useEffect(() => {
     setFormData(eventData);
@@ -58,10 +54,7 @@ const EventModal: React.FC<EventModalProps> = ({ eventData, onClose, onSave, onD
     setFormData((prev) => (prev ? { ...prev, [name]: new Date(value) } : null));
   };
 
-  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => (prev ? { ...prev, [name]: parseInt(value, 10) || 0 } : null));
-  };
+  // No booking numeric fields are shown/edited.
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,66 +168,7 @@ const EventModal: React.FC<EventModalProps> = ({ eventData, onClose, onSave, onD
                 className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-violet-500 focus:border-violet-500"
               ></textarea>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <label
-                  htmlFor={capacityId}
-                  className="block text-sm font-medium text-slate-600 mb-1"
-                >
-                  Capacity
-                </label>
-                <input
-                  type="number"
-                  name="capacity"
-                  id={capacityId}
-                  value={formData.capacity || 0}
-                  onChange={handleNumberChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-violet-500 focus:border-violet-500"
-                />
-              </div>
-              <div>
-                <label htmlFor={totalId} className="block text-sm font-medium text-slate-600 mb-1">
-                  Total Booked
-                </label>
-                <input
-                  type="number"
-                  name="total"
-                  id={totalId}
-                  value={formData.total || 0}
-                  onChange={handleNumberChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-violet-500 focus:border-violet-500"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor={waitingId}
-                  className="block text-sm font-medium text-slate-600 mb-1"
-                >
-                  Waiting
-                </label>
-                <input
-                  type="number"
-                  name="waiting"
-                  id={waitingId}
-                  value={formData.waiting || 0}
-                  onChange={handleNumberChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-violet-500 focus:border-violet-500"
-                />
-              </div>
-              <div>
-                <label htmlFor={priceId} className="block text-sm font-medium text-slate-600 mb-1">
-                  Price
-                </label>
-                <input
-                  type="number"
-                  name="price"
-                  id={priceId}
-                  value={formData.price || 0}
-                  onChange={handleNumberChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-violet-500 focus:border-violet-500"
-                />
-              </div>
-            </div>
+            {/* Booking-related fields removed for print-only use */}
           </div>
           <div className="p-4 bg-slate-50 rounded-b-lg flex justify-between items-center">
             <div>
@@ -278,8 +212,6 @@ interface ScheduleProps {
   onEventUpdate: (updatedEvent: ScheduleEvent) => void;
   onEventDelete: (eventId: string) => void;
   onEventCreate: (newEvent: ScheduleEvent) => void;
-  showDateNumbers: boolean;
-  showBookingCounts: boolean;
 }
 
 export const Schedule: React.FC<ScheduleProps> = ({
@@ -288,8 +220,6 @@ export const Schedule: React.FC<ScheduleProps> = ({
   onEventUpdate,
   onEventDelete,
   onEventCreate,
-  showDateNumbers,
-  showBookingCounts,
 }) => {
   const [modalEvent, setModalEvent] = useState<ScheduleEvent | Partial<ScheduleEvent> | null>(null);
 
@@ -413,9 +343,6 @@ export const Schedule: React.FC<ScheduleProps> = ({
             className="flex-1 text-center py-2 border-r border-slate-200"
           >
             <span className="font-semibold text-slate-700">{daysOfWeek[i]}</span>
-            {showDateNumbers && (
-              <span className="block text-sm text-slate-500 mt-1">{day.getDate()}</span>
-            )}
           </div>
         ))}
       </div>
@@ -497,14 +424,6 @@ export const Schedule: React.FC<ScheduleProps> = ({
                     <p className="text-opacity-80">
                       {formatTime(event.start)} - {formatTime(event.end)}
                     </p>
-                    {showBookingCounts && (
-                      <div className="mt-1 text-opacity-90">
-                        <span>
-                          {event.total}/{event.capacity}
-                        </span>
-                        {event.waiting > 0 && <span className="ml-2">({event.waiting} w)</span>}
-                      </div>
-                    )}
                   </div>
                 );
               })}

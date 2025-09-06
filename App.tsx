@@ -136,8 +136,6 @@ const App: React.FC = () => {
   const [inputData, setInputData] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
-  const [showDateNumbers, setShowDateNumbers] = useState(true);
-  const [showBookingCounts, setShowBookingCounts] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -643,26 +641,6 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="w-full sm:w-auto flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex justify-center sm:justify-end items-center gap-4">
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showDateNumbers}
-                onChange={() => setShowDateNumbers((s) => !s)}
-                className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-              />
-              Show Dates
-            </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showBookingCounts}
-                onChange={() => setShowBookingCounts((s) => !s)}
-                className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-              />
-              Show Bookings
-            </label>
-          </div>
           <div className="flex justify-center sm:justify-end items-center gap-2">
             <button
               onClick={() => {
@@ -695,8 +673,6 @@ const App: React.FC = () => {
             onEventUpdate={updateEvent}
             onEventDelete={deleteEvent}
             onEventCreate={createNewEvent}
-            showDateNumbers={showDateNumbers}
-            showBookingCounts={showBookingCounts}
           />
         )}
       </div>
