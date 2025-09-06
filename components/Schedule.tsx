@@ -296,6 +296,14 @@ export const Schedule: React.FC<ScheduleProps> = ({
     return grouped;
   }, [events, getEventPosition]);
 
+  // Determine which weekend days to show: hide empty Saturday/Sunday
+  const visibleDayIndices = useMemo(() => {
+    const indices = [0, 1, 2, 3, 4]; // Always show Mon-Fri
+    if ((eventsByDay[5] || []).length > 0) indices.push(5); // Saturday if has events
+    if ((eventsByDay[6] || []).length > 0) indices.push(6); // Sunday if has events
+    return indices;
+  }, [eventsByDay]);
+
   const handleSlotClick = (day: Date, hour: number) => {
     const start = new Date(day);
     start.setHours(hour, 0, 0, 0);
@@ -335,14 +343,17 @@ export const Schedule: React.FC<ScheduleProps> = ({
   return (
     <div className="flex flex-col select-none">
       {/* Header */}
-      <div className="grid grid-cols-[4rem_repeat(7,1fr)] sticky top-0 bg-white z-10 border-b border-l border-slate-200">
+      <div
+        className="grid sticky top-0 bg-white z-10 border-b border-l border-slate-200"
+        style={{ gridTemplateColumns: `4rem repeat(${visibleDayIndices.length}, minmax(0, 1fr))` }}
+      >
         <div className="w-16 border-r border-slate-200"></div>
-        {days.map((day, i) => (
+        {visibleDayIndices.map((dayIdx) => (
           <div
-            key={day.toISOString()}
+            key={days[dayIdx].toISOString()}
             className="flex-1 text-center py-2 border-r border-slate-200"
           >
-            <span className="font-semibold text-slate-700">{daysOfWeek[i]}</span>
+            <span className="font-semibold text-slate-700">{daysOfWeek[dayIdx]}</span>
           </div>
         ))}
       </div>
@@ -361,9 +372,12 @@ export const Schedule: React.FC<ScheduleProps> = ({
           ))}
         </div>
 
-        <div className="grid grid-cols-7 flex-grow relative border-l border-slate-200">
+        <div
+          className="grid flex-grow relative border-l border-slate-200"
+          style={{ gridTemplateColumns: `repeat(${visibleDayIndices.length}, minmax(0, 1fr))` }}
+        >
           {/* Grid lines */}
-          <div className="col-span-7 grid grid-cols-1 absolute inset-0">
+          <div className="grid grid-cols-1 absolute inset-0">
             {hours.map((hour) => (
               <div
                 key={hour}
@@ -374,27 +388,27 @@ export const Schedule: React.FC<ScheduleProps> = ({
           </div>
 
           {/* Day columns */}
-          {days.map((day, dayIndex) => (
+          {visibleDayIndices.map((dayIndex) => (
             <div
-              key={day.toISOString()}
+              key={days[dayIndex].toISOString()}
               className="relative border-r border-slate-200"
               onClick={(e) => {
                 if (e.target === e.currentTarget) {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const y = e.clientY - rect.top;
                   const hour = Math.floor(y / HOUR_HEIGHT) + CALENDAR_START_HOUR;
-                  handleSlotClick(day, hour);
+                  handleSlotClick(days[dayIndex], hour);
                 }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  handleSlotClick(day, CALENDAR_START_HOUR);
+                  handleSlotClick(days[dayIndex], CALENDAR_START_HOUR);
                 }
               }}
               role="button"
               tabIndex={0}
-              aria-label={`Create event on ${day.toLocaleDateString()}`}
+              aria-label={`Create event on ${days[dayIndex].toLocaleDateString()}`}
             >
               {/* Events for this day */}
               {(eventsByDay[dayIndex] || []).map((event) => {
