@@ -396,14 +396,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleWeekChange = (direction: "next" | "prev") => {
-    if (currentWeekStart) {
-      const newWeekStart = new Date(currentWeekStart);
-      const offset = direction === "next" ? 7 : -7;
-      newWeekStart.setDate(newWeekStart.getDate() + offset);
-      setCurrentWeekStart(newWeekStart);
-    }
-  };
+  // Week navigation removed for print-only use
 
   const currentWeekEvents = useMemo(() => {
     if (!currentWeekStart) return [];
@@ -412,13 +405,7 @@ const App: React.FC = () => {
     return events.filter((event) => event.start >= currentWeekStart && event.start < weekEnd);
   }, [events, currentWeekStart]);
 
-  const weekRangeString = useMemo(() => {
-    if (!currentWeekStart) return "";
-    const end = new Date(currentWeekStart);
-    end.setDate(end.getDate() + 6);
-    const options: Intl.DateTimeFormatOptions = { month: "long", day: "numeric" };
-    return `${currentWeekStart.toLocaleDateString(undefined, options)} - ${end.toLocaleDateString(undefined, options)}, ${currentWeekStart.getFullYear()}`;
-  }, [currentWeekStart]);
+  // Week range label removed for print-only use
 
   if (events.length === 0) {
     return (
@@ -598,47 +585,6 @@ const App: React.FC = () => {
       <header className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="text-center sm:text-left">
           <h1 className="text-3xl font-bold text-slate-800">Weekly Schedule</h1>
-          <div className="flex items-center justify-center sm:justify-start gap-4 mt-2">
-            <button
-              onClick={() => handleWeekChange("prev")}
-              className="p-2 rounded-full hover:bg-slate-200 transition-colors"
-              aria-label="Previous week"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-slate-600"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-            <h2 className="text-lg font-semibold text-slate-600 whitespace-nowrap">
-              {weekRangeString}
-            </h2>
-            <button
-              onClick={() => handleWeekChange("next")}
-              className="p-2 rounded-full hover:bg-slate-200 transition-colors"
-              aria-label="Next week"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-slate-600"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          </div>
         </div>
         <div className="w-full sm:w-auto flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex justify-center sm:justify-end items-center gap-2">
