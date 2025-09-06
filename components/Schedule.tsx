@@ -2,9 +2,13 @@ import type React from "react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import type { ScheduleEvent } from "../types";
 
-const HOUR_HEIGHT = 60; // pixels per hour
+const HOUR_HEIGHT = 60; // pixels per hour for visible sections
+// Default bounds (used only as fallback when no events are present)
 const CALENDAR_START_HOUR = 6;
 const CALENDAR_END_HOUR = 23;
+// Gap collapse configuration
+const GAP_MARKER_HEIGHT = 16; // pixels height for the collapsed gap marker
+const MIN_COLLAPSIBLE_GAP_MINUTES = 60; // collapse only gaps >= 60 minutes
 const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // --- Helper Functions ---
@@ -232,28 +236,148 @@ export const Schedule: React.FC<ScheduleProps> = ({
     });
   }, [weekStart]);
 
-  const hours = useMemo(() => {
-    return Array.from(
-      { length: CALENDAR_END_HOUR - CALENDAR_START_HOUR + 1 },
-      (_, i) => CALENDAR_START_HOUR + i
-    );
-  }, []);
+  // Minutes of day helper
+  const minutesOfDay = useCallback((date: Date) => date.getHours() * 60 + date.getMinutes(), []);
 
-  const getEventPosition = useCallback((event: ScheduleEvent) => {
-    const startOfDay = new Date(event.start);
-    startOfDay.setHours(CALENDAR_START_HOUR, 0, 0, 0);
+  // Compute global visible window (crop fully empty top/bottom hours across the entire week)
+  const { visibleStartMin, visibleEndMin } = useMemo(() => {
+    if (events.length === 0) {
+      return {
+        visibleStartMin: CALENDAR_START_HOUR * 60,
+        visibleEndMin: CALENDAR_END_HOUR * 60,
+      };
+    }
 
-    const minutesFromCalendarStart = (event.start.getTime() - startOfDay.getTime()) / (1000 * 60);
-    const top = (minutesFromCalendarStart / 60) * HOUR_HEIGHT;
+    let minStart = Infinity;
+    let maxEnd = -Infinity;
+    for (const e of events) {
+      const s = minutesOfDay(e.start);
+      const en = minutesOfDay(e.end);
+      if (s < minStart) minStart = s;
+      if (en > maxEnd) maxEnd = en;
+    }
+    // Round to hour for tidy grid
+    minStart = Math.max(0, Math.floor(minStart / 60) * 60);
+    maxEnd = Math.min(24 * 60, Math.ceil(maxEnd / 60) * 60);
+    return { visibleStartMin: minStart, visibleEndMin: maxEnd };
+  }, [events, minutesOfDay]);
 
-    const durationMinutes = (event.end.getTime() - event.start.getTime()) / (1000 * 60);
-    const height = Math.max((durationMinutes / 60) * HOUR_HEIGHT, 20); // min height
+  // Build union of time intervals where at least one event exists across any day
+  const unionIntervals = useMemo(() => {
+    const intervals: Array<{ start: number; end: number }> = [];
+    for (const e of events) {
+      const start = Math.max(visibleStartMin, minutesOfDay(e.start));
+      const end = Math.min(visibleEndMin, minutesOfDay(e.end));
+      if (end > start) intervals.push({ start, end });
+    }
+    intervals.sort((a, b) => a.start - b.start);
+    // Merge
+    const merged: Array<{ start: number; end: number }> = [];
+    for (const iv of intervals) {
+      if (merged.length === 0 || iv.start > merged[merged.length - 1].end) {
+        merged.push({ ...iv });
+      } else {
+        merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, iv.end);
+      }
+    }
+    return merged;
+  }, [events, visibleStartMin, visibleEndMin, minutesOfDay]);
 
-    let dayIndex = event.start.getDay() - 1;
-    if (dayIndex === -1) dayIndex = 6;
+  // Create vertical timeline segments: visible stretches and collapsed gaps
+  type Segment = { type: "visible" | "gap"; start: number; end: number; height: number };
+  const segments = useMemo<Segment[]>(() => {
+    const segs: Segment[] = [];
+    if (visibleEndMin <= visibleStartMin) return segs;
 
-    return { top, height, dayIndex };
-  }, []);
+    if (unionIntervals.length === 0) {
+      // No events within window – show a single visible block (fallback)
+      segs.push({
+        type: "visible",
+        start: visibleStartMin,
+        end: visibleEndMin,
+        height: ((visibleEndMin - visibleStartMin) / 60) * HOUR_HEIGHT,
+      });
+      return segs;
+    }
+
+    // Build gaps between merged intervals, ignoring outer gaps (they are cropped already)
+    const intervals: Array<{ start: number; end: number }> = unionIntervals.slice();
+    // Visible segment before first interval is already cropped out
+    for (let i = 0; i < intervals.length; i++) {
+      const cur = intervals[i];
+      // Add visible segment for current interval
+      segs.push({
+        type: "visible",
+        start: cur.start,
+        end: cur.end,
+        height: ((cur.end - cur.start) / 60) * HOUR_HEIGHT,
+      });
+
+      const next = intervals[i + 1];
+      if (!next) break;
+      const gapStart = cur.end;
+      const gapEnd = next.start;
+      const gapMinutes = gapEnd - gapStart;
+      if (gapMinutes > 0) {
+        if (gapMinutes >= MIN_COLLAPSIBLE_GAP_MINUTES) {
+          segs.push({ type: "gap", start: gapStart, end: gapEnd, height: GAP_MARKER_HEIGHT });
+        } else {
+          // Small gap – keep as visible space to avoid excessive markers
+          segs.push({
+            type: "visible",
+            start: gapStart,
+            end: gapEnd,
+            height: (gapMinutes / 60) * HOUR_HEIGHT,
+          });
+        }
+      }
+    }
+    return segs;
+  }, [unionIntervals, visibleStartMin, visibleEndMin]);
+
+  const totalHeight = useMemo(() => segments.reduce((acc, s) => acc + s.height, 0), [segments]);
+
+  // Map absolute minutes-of-day to Y position considering collapsed gaps
+  const mapMinToY = useCallback(
+    (absMin: number) => {
+      // Clamp into cropped window
+      const clamped = Math.max(visibleStartMin, Math.min(absMin, visibleEndMin));
+      let y = 0;
+      for (const seg of segments) {
+        if (clamped < seg.start) break;
+        if (clamped >= seg.end) {
+          y += seg.height;
+        } else {
+          if (seg.type === "visible") {
+            y += ((clamped - seg.start) / 60) * HOUR_HEIGHT;
+          } else {
+            // Inside a collapsed gap: place at the gap start position
+            // (this situation should not occur for events since gaps have no events)
+            y += 0;
+          }
+          break;
+        }
+      }
+      return y;
+    },
+    [segments, visibleStartMin, visibleEndMin]
+  );
+
+  const getEventPosition = useCallback(
+    (event: ScheduleEvent) => {
+      const startMin = minutesOfDay(event.start);
+      const endMin = minutesOfDay(event.end);
+      const top = mapMinToY(startMin);
+      const mappedEnd = mapMinToY(endMin);
+      const height = Math.max(mappedEnd - top, 20); // enforce a minimum height
+
+      let dayIndex = event.start.getDay() - 1;
+      if (dayIndex === -1) dayIndex = 6;
+
+      return { top, height, dayIndex };
+    },
+    [mapMinToY, minutesOfDay]
+  );
 
   const eventsByDay = useMemo(() => {
     const grouped: { [key: number]: ScheduleEvent[] } = {};
@@ -348,18 +472,47 @@ export const Schedule: React.FC<ScheduleProps> = ({
           className="grid flex-grow relative border-l border-slate-200"
           style={{
             gridTemplateColumns: `repeat(${visibleDayIndices.length}, minmax(0, 1fr))`,
-            height: `${hours.length * HOUR_HEIGHT}px`,
+            height: `${totalHeight}px`,
           }}
         >
-          {/* Grid lines */}
-          <div className="grid grid-cols-1 absolute inset-0">
-            {hours.map((hour) => (
-              <div
-                key={hour}
-                style={{ height: `${HOUR_HEIGHT}px` }}
-                className="border-b border-slate-200"
-              ></div>
-            ))}
+          {/* Grid background: visible sections with hour lines + collapsed gap markers */}
+          <div className="absolute inset-0 flex flex-col">
+            {segments.map((seg, idx) => {
+              if (seg.type === "gap") {
+                return (
+                  <div key={`gap-${idx}`} style={{ height: `${seg.height}px` }} className="flex items-center">
+                    <div className="w-full border-t border-dashed border-slate-300 relative">
+                      <span className="absolute left-1/2 -translate-x-1/2 -top-2 text-slate-400 text-xs tracking-widest">
+                        • • •
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Visible time segment: draw hour separators within this segment
+              const rows = [] as any[];
+              let p = seg.start;
+              while (p < seg.end) {
+                const nextBoundary = Math.min(seg.end, Math.floor(p / 60) * 60 + 60);
+                const blockMin = Math.max(0, nextBoundary - p);
+                const h = (blockMin / 60) * HOUR_HEIGHT;
+                rows.push(
+                  <div key={`row-${idx}-${p}`} style={{ height: `${h}px` }} className="border-b border-slate-200" />
+                );
+                p = nextBoundary;
+              }
+
+              return (
+                <div key={`vis-${idx}`} style={{ height: `${seg.height}px` }} className="flex flex-col">
+                  {rows.length === 0 ? (
+                    <div className="border-b border-slate-200" style={{ height: `${seg.height}px` }} />
+                  ) : (
+                    rows
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Day columns */}
