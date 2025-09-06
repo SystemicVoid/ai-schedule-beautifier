@@ -26,32 +26,102 @@ const parseDate = (dateStr: string, timeStr: string): Date | null => {
   return null;
 };
 
+// Exact palette extracted from the booking app screenshot (ffmpeg palettegen)
+// Mapped one-to-one by class/category keywords
+const EXACT_TITLE_COLORS: Array<{
+  match: (title: string) => boolean;
+  bg: string;
+  text: string;
+  border?: string;
+}> = [
+  // Calistenia → golden yellow with dark text
+  {
+    match: (t) => /calistenia/i.test(t),
+    bg: "bg-[#e8b400]",
+    text: "text-black",
+    border: "border-[#e4a700]",
+  },
+  // Pole (incl. Pole Sport) → vivid purple with white text
+  {
+    match: (t) => /\bpole(?!.*adolescent)/i.test(t) || /pole\s*sport/i.test(t),
+    bg: "bg-[#a756f8]",
+    text: "text-white",
+    border: "border-[#8f3ff1]",
+  },
+  // Pole-Adolescentes → pinkish variant close to pole but distinct
+  {
+    match: (t) => /adolescent/i.test(t),
+    // Use a lighter pink (#f18bbc) with a deeper magenta border for contrast
+    bg: "bg-[#f18bbc]",
+    text: "text-white",
+    border: "border-[#ea58a4]",
+  },
+  // Lira (Aro) → cyan/sky teal
+  {
+    match: (t) => /(lira|\baro\b)/i.test(t),
+    bg: "bg-[#48c0d9]",
+    text: "text-white",
+    border: "border-[#39bcd7]",
+  },
+  // Stretching variants (Spagat, Pancake, Plegadito, Puente, Flex Integral) → green-teal
+  {
+    match: (t) => /stretching|spagat|pancake|plegadit|puente|flex/i.test(t),
+    bg: "bg-[#34b9a8]",
+    text: "text-white",
+    border: "border-[#2db7a5]",
+  },
+  // Acro-kids → fresh green
+  {
+    match: (t) => /(acro[-\s]?kids?|acrokids)/i.test(t),
+    bg: "bg-[#35c45b]",
+    text: "text-white",
+    border: "border-[#2fad50]",
+  },
+  // Handstand (Invertidas) → blue-grey
+  {
+    match: (t) => /handstand|invertid/i.test(t),
+    bg: "bg-[#65748b]",
+    text: "text-white",
+    border: "border-[#5a6578]",
+  },
+];
+
+// Fallback rotated palette (used only if no match above)
 const COLORS = [
-  "bg-rose-200 border-rose-300",
-  "bg-amber-200 border-amber-300",
-  "bg-lime-200 border-lime-300",
-  "bg-emerald-200 border-emerald-300",
-  "bg-cyan-200 border-cyan-300",
-  "bg-violet-200 border-violet-300",
-  "bg-fuchsia-200 border-fuchsia-300",
-  "bg-sky-200 border-sky-300",
+  "bg-[#2db7a5] border-[#2db7a5]",
+  "bg-[#e8b400] border-[#e8b400]",
+  "bg-[#35c45b] border-[#35c45b]",
+  "bg-[#48c0d9] border-[#48c0d9]",
+  "bg-[#a756f8] border-[#a756f8]",
+  "bg-[#ea58a4] border-[#ea58a4]",
+  "bg-[#65748b] border-[#65748b]",
+  "bg-[#95eaf0] border-[#95eaf0]",
 ];
 
 const TEXT_COLORS = [
-  "text-rose-800",
-  "text-amber-800",
-  "text-lime-800",
-  "text-emerald-800",
-  "text-cyan-800",
-  "text-violet-800",
-  "text-fuchsia-800",
-  "text-sky-800",
+  "text-white",
+  "text-black",
+  "text-white",
+  "text-white",
+  "text-white",
+  "text-white",
+  "text-white",
+  "text-slate-800",
 ];
 
 const getColor = (title: string, colorMap: Map<string, { bg: string; text: string }>) => {
   if (!colorMap.has(title)) {
-    const index = colorMap.size % COLORS.length;
-    colorMap.set(title, { bg: COLORS[index], text: TEXT_COLORS[index] });
+    // First, try to match exact mapping by class keywords
+    const entry = EXACT_TITLE_COLORS.find((e) => e.match(title));
+    if (entry) {
+      colorMap.set(title, {
+        bg: `${entry.bg} ${entry.border ?? ""}`.trim(),
+        text: entry.text,
+      });
+    } else {
+      const index = colorMap.size % COLORS.length;
+      colorMap.set(title, { bg: COLORS[index], text: TEXT_COLORS[index] });
+    }
   }
   const color = colorMap.get(title);
   if (!color) {
