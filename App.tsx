@@ -41,20 +41,21 @@ const EXACT_TITLE_COLORS: Array<{
     text: "text-black",
     border: "border-[#e4a700]",
   },
-  // Pole (incl. Pole Sport) → vivid purple with white text
-  {
-    match: (t) => /\bpole(?!.*adolescent)/i.test(t) || /pole\s*sport/i.test(t),
-    bg: "bg-[#a756f8]",
-    text: "text-white",
-    border: "border-[#8f3ff1]",
-  },
   // Pole-Adolescentes → pinkish variant close to pole but distinct
   {
-    match: (t) => /adolescent/i.test(t),
+    // Handle both correct and misspelled forms found in data ("Adolescentes" / "Adolecentes")
+    match: (t) => /(adolesc|adole)/i.test(t),
     // Use a lighter pink (#f18bbc) with a deeper magenta border for contrast
     bg: "bg-[#f18bbc]",
     text: "text-white",
     border: "border-[#ea58a4]",
+  },
+  // Pole (incl. Pole Sport) → vivid purple with white text
+  {
+    match: (t) => /\bpole(?!.*(?:adolesc|adole))/i.test(t) || /pole\s*sport/i.test(t),
+    bg: "bg-[#a756f8]",
+    text: "text-white",
+    border: "border-[#8f3ff1]",
   },
   // Lira (Aro) → cyan/sky teal
   {
