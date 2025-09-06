@@ -331,70 +331,7 @@ const App: React.FC = () => {
     setEvents((prev) => [...prev, { ...newEvent, color: `${bg} ${text}` }]);
   };
 
-  // Declare types for external PDF libraries
-  interface Html2CanvasWindow extends Window {
-    html2canvas?: (element: HTMLElement, options?: unknown) => Promise<HTMLCanvasElement>;
-    jspdf?: {
-      jsPDF: new (
-        options?: unknown
-      ) => {
-        internal: { pageSize: { getWidth: () => number; getHeight: () => number } };
-        addImage: (
-          imgData: string,
-          format: string,
-          x: number,
-          y: number,
-          width: number,
-          height: number
-        ) => void;
-        save: (filename: string) => void;
-      };
-    };
-  }
-
-  const handleExportToPDF = () => {
-    const scheduleElement = document.getElementById("schedule-to-print");
-    const htmlWindow = window as Html2CanvasWindow;
-
-    if (scheduleElement && htmlWindow.html2canvas && htmlWindow.jspdf) {
-      const { jsPDF } = htmlWindow.jspdf;
-      htmlWindow
-        .html2canvas(scheduleElement, { scale: 2, logging: false })
-        .then((canvas: HTMLCanvasElement) => {
-          const imgData = canvas.toDataURL("image/png");
-          const pdf = new jsPDF({
-            orientation: "landscape",
-            unit: "px",
-            hotfixes: ["px_scaling"],
-          });
-
-          const pageW = pdf.internal.pageSize.getWidth();
-          const pageH = pdf.internal.pageSize.getHeight();
-
-          const canvasW = canvas.width;
-          const canvasH = canvas.height;
-          const ratio = canvasW / canvasH;
-
-          let pdfW = pageW - 20; // with margin
-          let pdfH = pdfW / ratio;
-
-          if (pdfH > pageH - 20) {
-            pdfH = pageH - 20;
-            pdfW = pdfH * ratio;
-          }
-
-          const x = (pageW - pdfW) / 2;
-          const y = (pageH - pdfH) / 2;
-
-          pdf.addImage(imgData, "PNG", x, y, pdfW, pdfH);
-          pdf.save("schedule.pdf");
-        });
-    } else {
-      alert(
-        "PDF generation library could not be loaded. Please check your connection and try again."
-      );
-    }
-  };
+  // PDF export removed: use browser's built-in print to save as PDF
 
   // Week navigation removed for print-only use
 
@@ -582,36 +519,7 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-100 min-h-screen p-4 sm:p-6 lg:p-8 font-sans">
-      <header className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="text-center sm:text-left">
-          <h1 className="text-3xl font-bold text-slate-800">Weekly Schedule</h1>
-        </div>
-        <div className="w-full sm:w-auto flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex justify-center sm:justify-end items-center gap-2">
-            <button
-              onClick={() => {
-                setEvents([]);
-                setInputData("");
-                setCurrentWeekStart(null);
-              }}
-              className="bg-white text-slate-700 font-semibold py-2 px-4 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-            >
-              New Schedule
-            </button>
-            <button
-              onClick={handleExportToPDF}
-              className="bg-violet-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-violet-700 transition-all duration-200 shadow-sm"
-            >
-              Export to PDF
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div
-        id="schedule-to-print"
-        className="bg-white p-4 rounded-lg shadow-md border border-slate-200"
-      >
+      <div id="schedule-to-print" className="bg-white p-4 rounded-lg shadow-md border border-slate-200">
         {currentWeekStart && (
           <Schedule
             events={currentWeekEvents}

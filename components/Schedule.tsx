@@ -304,23 +304,8 @@ export const Schedule: React.FC<ScheduleProps> = ({
     return indices;
   }, [eventsByDay]);
 
-  const handleSlotClick = (day: Date, hour: number) => {
-    const start = new Date(day);
-    start.setHours(hour, 0, 0, 0);
-    const end = new Date(day);
-    end.setHours(hour + 1, 0, 0, 0);
-
-    setModalEvent({
-      start,
-      end,
-      title: "",
-      description: "",
-      capacity: 10,
-      total: 0,
-      waiting: 0,
-      price: 0,
-    });
-  };
+  // Creation/editing interactions disabled for print-only display
+  const handleSlotClick = (_day: Date, _hour: number) => {};
 
   const handleModalClose = () => {
     setModalEvent(null);
@@ -345,9 +330,8 @@ export const Schedule: React.FC<ScheduleProps> = ({
       {/* Header */}
       <div
         className="grid sticky top-0 bg-white z-10 border-b border-l border-slate-200"
-        style={{ gridTemplateColumns: `4rem repeat(${visibleDayIndices.length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${visibleDayIndices.length}, minmax(0, 1fr))` }}
       >
-        <div className="w-16 border-r border-slate-200"></div>
         {visibleDayIndices.map((dayIdx) => (
           <div
             key={days[dayIdx].toISOString()}
@@ -360,21 +344,12 @@ export const Schedule: React.FC<ScheduleProps> = ({
 
       {/* Body */}
       <div className="flex flex-grow overflow-auto">
-        <div className="w-16 flex-shrink-0">
-          {hours.map((hour) => (
-            <div
-              key={hour}
-              style={{ height: `${HOUR_HEIGHT}px` }}
-              className="relative text-right pr-2"
-            >
-              <span className="text-xs text-slate-400 absolute -top-2 right-2">{hour}:00</span>
-            </div>
-          ))}
-        </div>
-
         <div
           className="grid flex-grow relative border-l border-slate-200"
-          style={{ gridTemplateColumns: `repeat(${visibleDayIndices.length}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(${visibleDayIndices.length}, minmax(0, 1fr))`,
+            height: `${hours.length * HOUR_HEIGHT}px`,
+          }}
         >
           {/* Grid lines */}
           <div className="grid grid-cols-1 absolute inset-0">
@@ -392,23 +367,6 @@ export const Schedule: React.FC<ScheduleProps> = ({
             <div
               key={days[dayIndex].toISOString()}
               className="relative border-r border-slate-200"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const y = e.clientY - rect.top;
-                  const hour = Math.floor(y / HOUR_HEIGHT) + CALENDAR_START_HOUR;
-                  handleSlotClick(days[dayIndex], hour);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleSlotClick(days[dayIndex], CALENDAR_START_HOUR);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              aria-label={`Create event on ${days[dayIndex].toLocaleDateString()}`}
             >
               {/* Events for this day */}
               {(eventsByDay[dayIndex] || []).map((event) => {
@@ -421,18 +379,8 @@ export const Schedule: React.FC<ScheduleProps> = ({
                 return (
                   <div
                     key={event.id}
-                    onClick={() => setModalEvent(event)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setModalEvent(event);
-                      }
-                    }}
                     style={{ top: `${top}px`, height: `${height}px`, width, left }}
-                    className={`absolute p-2 rounded-lg border text-xs cursor-pointer transition-all duration-200 ease-in-out hover:shadow-lg hover:border-opacity-100 overflow-hidden ${event.color}`}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Edit event: ${event.title} from ${formatTime(event.start)} to ${formatTime(event.end)}`}
+                    className={`absolute p-2 rounded-lg border text-xs overflow-hidden ${event.color}`}
                   >
                     <p className="font-bold truncate">{event.title}</p>
                     <p className="text-opacity-80">
