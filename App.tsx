@@ -38,6 +38,77 @@ const getColor = (title: string, colorMap: Map<string, { bg: string, text: strin
   return colorMap.get(title)!;
 };
 
+// CSV parser utility that handles quoted fields properly
+const parseCSV = (text: string): string[][] => {
+  const result: string[][] = [];
+  const lines = text.split('\n');
+  let currentRow: string[] = [];
+  let currentField = '';
+  let insideQuotes = false;
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    let charIndex = 0;
+
+    while (charIndex < line.length) {
+      const char = line[charIndex];
+
+      if (char === '"') {
+        if (insideQuotes && line[charIndex + 1] === '"') {
+          // Escaped quote
+          currentField += '"';
+          charIndex += 2;
+        } else {
+          // Toggle quote state
+          insideQuotes = !insideQuotes;
+          charIndex++;
+        }
+      } else if (char === ',' && !insideQuotes) {
+        // Field separator
+        currentRow.push(currentField.trim());
+        currentField = '';
+        charIndex++;
+      } else {
+        currentField += char;
+        charIndex++;
+      }
+    }
+
+    if (!insideQuotes) {
+      // End of row
+      currentRow.push(currentField.trim());
+      if (currentRow.some(field => field.length > 0)) {
+        result.push(currentRow);
+      }
+      currentRow = [];
+      currentField = '';
+    } else {
+      // Continue to next line (multi-line field)
+      currentField += '\n';
+    }
+
+    i++;
+  }
+
+  // Handle last row if not completed
+  if (currentRow.length > 0 || currentField.length > 0) {
+    currentRow.push(currentField.trim());
+    result.push(currentRow);
+  }
+
+  return result;
+};
+
+// Detect if input is CSV or TSV format
+const detectFormat = (text: string): 'csv' | 'tsv' => {
+  const firstLine = text.split('\n')[0];
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  
+  return commaCount > tabCount ? 'csv' : 'tsv';
+};
+
 
 const App: React.FC = () => {
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
@@ -46,21 +117,115 @@ const App: React.FC = () => {
   const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
   const [showDateNumbers, setShowDateNumbers] = useState(true);
   const [showBookingCounts, setShowBookingCounts] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [inputMode, setInputMode] = useState<'text' | 'file'>('text');
 
-  const handleGenerate = useCallback(() => {
-    setError(null);
-    const lines = inputData.trim().split('\n').slice(1); // Skip header
-    if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === '')) {
-      setError('Input data is empty. Please paste your schedule data.');
+  const handleFileSelect = (file: File) => {
+    if (file.type !== 'text/csv' && !file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.tsv')) {
+      setError('Please select a CSV or TSV file.');
       return;
     }
-    const colorMap = new Map<string, { bg: string, text: string }>();
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      setError('File size must be less than 5MB.');
+      return;
+    }
+    setSelectedFile(file);
+    setInputMode('file');
+    setError(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleFileSelect(files[0] as File);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  };
+
+  const clearFile = () => {
+    setSelectedFile(null);
+    setInputMode('text');
+    setError(null);
+  };
+
+  const processFile = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        if (!content) {
+          reject(new Error('Failed to read file content'));
+          return;
+        }
+        resolve(content);
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleGenerate = useCallback(async () => {
+    setError(null);
+    setIsProcessing(true);
 
     try {
-      const parsedEvents: ScheduleEvent[] = lines.map((line, index) => {
-        const columns = line.split('\t').map(c => c.trim());
+      let rawData = '';
+      
+      // Get data based on input mode
+      if (inputMode === 'file' && selectedFile) {
+        rawData = await processFile(selectedFile);
+      } else if (inputMode === 'text' && inputData.trim()) {
+        rawData = inputData.trim();
+      } else {
+        setError('Please provide schedule data either by uploading a file or pasting text.');
+        return;
+      }
+
+      // Detect format and parse data
+      const format = detectFormat(rawData);
+      let parsedRows: string[][];
+
+      if (format === 'csv') {
+        parsedRows = parseCSV(rawData);
+      } else {
+        // TSV format - split by tabs
+        parsedRows = rawData.split('\n').map(line => line.split('\t').map(field => field.trim()));
+      }
+
+      // Remove empty rows and get header + data rows
+      parsedRows = parsedRows.filter(row => row.some(cell => cell.length > 0));
+      
+      if (parsedRows.length < 2) {
+        setError('File must contain at least a header row and one data row.');
+        return;
+      }
+
+      const dataRows = parsedRows.slice(1); // Skip header
+      const colorMap = new Map<string, { bg: string, text: string }>();
+
+      const parsedEvents: ScheduleEvent[] = dataRows.map((columns, index) => {
         if (columns.length < 8) {
-          throw new Error(`Line ${index + 2}: Not enough columns. Expected 8, found ${columns.length}.`);
+          throw new Error(`Row ${index + 2}: Not enough columns. Expected 8, found ${columns.length}.`);
         }
         
         const [startDateStr, startTimeStr] = columns[0].split(/\s+/);
@@ -70,7 +235,7 @@ const App: React.FC = () => {
         const end = parseDate(endDateStr, endTimeStr);
 
         if (!start || !end) {
-          throw new Error(`Line ${index + 2}: Invalid date/time format.`);
+          throw new Error(`Row ${index + 2}: Invalid date/time format in "${columns[0]}" or "${columns[1]}".`);
         }
 
         const title = columns[2];
@@ -82,15 +247,16 @@ const App: React.FC = () => {
           end,
           title,
           description: columns[3],
-          capacity: parseInt(columns[4], 10),
-          total: parseInt(columns[5], 10),
-          waiting: parseInt(columns[6], 10),
-          price: parseInt(columns[7], 10),
+          capacity: parseInt(columns[4], 10) || 0,
+          total: parseInt(columns[5], 10) || 0,
+          waiting: parseInt(columns[6], 10) || 0,
+          price: parseFloat(columns[7]) || 0,
           color: `${bg} ${text}`,
         };
       }).filter(e => e.start && e.end);
 
       setEvents(parsedEvents);
+      
       if (parsedEvents.length > 0) {
         const firstEventDate = parsedEvents.sort((a,b) => a.start.getTime() - b.start.getTime())[0].start;
         const weekStart = new Date(firstEventDate);
@@ -110,8 +276,10 @@ const App: React.FC = () => {
       }
       setEvents([]);
       setCurrentWeekStart(null);
+    } finally {
+      setIsProcessing(false);
     }
-  }, [inputData]);
+  }, [inputData, inputMode, selectedFile]);
 
   const updateEvent = (updatedEvent: ScheduleEvent) => {
     setEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
@@ -195,23 +363,117 @@ const App: React.FC = () => {
   if (events.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-3xl bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
+        <div className="w-full max-w-4xl bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
           <div className="text-center mb-6">
             <h1 className="text-4xl font-bold text-slate-900">Schedule Beautifier</h1>
-            <p className="text-slate-500 mt-2">Paste your tab-separated schedule data below to generate a beautiful calendar view.</p>
+            <p className="text-slate-500 mt-2">Upload a CSV/TSV file or paste your schedule data to generate a beautiful calendar view.</p>
           </div>
-          <textarea
-            value={inputData}
-            onChange={(e) => setInputData(e.target.value)}
-            className="w-full h-64 p-4 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow duration-200"
-            placeholder={`Hora de inicio\tHora de finalización\tTítulo\tDescripción\tCapacidad\tTotal\tEsperando\tPrecio\n8/9/2025 8:30\t8/9/2025 9:30\tStretching (Spagat)\t...\t10\t1\t0\t1`}
-          />
-          {error && <p className="text-red-500 mt-2 text-sm">{error}</p>}
+          
+          {/* Input Mode Toggle */}
+          <div className="flex justify-center mb-6">
+            <div className="bg-slate-100 p-1 rounded-lg">
+              <button
+                onClick={() => setInputMode('file')}
+                className={`px-4 py-2 rounded-md transition-all ${
+                  inputMode === 'file' 
+                    ? 'bg-white shadow-sm text-violet-700 font-semibold' 
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Upload File
+              </button>
+              <button
+                onClick={() => setInputMode('text')}
+                className={`px-4 py-2 rounded-md transition-all ${
+                  inputMode === 'text' 
+                    ? 'bg-white shadow-sm text-violet-700 font-semibold' 
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Paste Data
+              </button>
+            </div>
+          </div>
+
+          {/* File Upload Section */}
+          {inputMode === 'file' && (
+            <div className="mb-6">
+              {!selectedFile ? (
+                <div
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-all ${
+                    isDragging 
+                      ? 'border-violet-400 bg-violet-50' 
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <div className="flex flex-col items-center">
+                    <svg className="w-12 h-12 text-slate-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-lg font-medium text-slate-700 mb-2">Drag & drop your CSV file here</p>
+                    <p className="text-slate-500 mb-4">or</p>
+                    <label className="cursor-pointer bg-violet-600 text-white px-6 py-2 rounded-lg hover:bg-violet-700 transition-colors">
+                      Choose File
+                      <input
+                        type="file"
+                        accept=".csv,.tsv"
+                        onChange={handleFileInputChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <p className="text-xs text-slate-400 mt-2">CSV or TSV files up to 5MB</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="border border-slate-300 rounded-lg p-4 bg-slate-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <svg className="w-8 h-8 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="font-medium text-slate-700">{selectedFile.name}</p>
+                        <p className="text-sm text-slate-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={clearFile}
+                      className="text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Text Input Section */}
+          {inputMode === 'text' && (
+            <div className="mb-6">
+              <textarea
+                value={inputData}
+                onChange={(e) => setInputData(e.target.value)}
+                className="w-full h-64 p-4 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow duration-200"
+                placeholder={`Hora de inicio,Hora de finalización,Título,Descripción,Capacidad,Total,Esperando,Precio
+8/9/2025 8:30,8/9/2025 9:30,Stretching (Spagat),...,10,1,0,1.00`}
+              />
+            </div>
+          )}
+
+          {error && <p className="text-red-500 mb-4 text-sm">{error}</p>}
+          
           <button
             onClick={handleGenerate}
-            className="w-full mt-4 bg-violet-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-700 active:bg-violet-800 transition-all duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
+            disabled={isProcessing || (inputMode === 'file' && !selectedFile) || (inputMode === 'text' && !inputData.trim())}
+            className="w-full bg-violet-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-700 active:bg-violet-800 transition-all duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Generate Schedule
+            {isProcessing ? 'Processing...' : 'Generate Schedule'}
           </button>
         </div>
       </div>
