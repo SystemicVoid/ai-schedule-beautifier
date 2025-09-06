@@ -35,6 +35,3 @@
 - Commits: imperative, concise subject; optional scope. Examples: `Add CSV file upload`, `Hide empty weekend columns`, `Remove PDF export for print-only`.
 - PRs: clear description, linked issue, reproduction steps, and before/after screenshots of the schedule view using a sample file. Note any UX/accessibility or print changes.
 
-## Security & Configuration Tips
-- Never commit secrets. Keep `GEMINI_API_KEY` only in `.env.local`.
-- The build injects `process.env.GEMINI_API_KEY` via Vite defines; avoid logging keys or sending them to clients unnecessarily.
