@@ -1,4 +1,3 @@
-
 export interface ScheduleEvent {
   id: string;
   start: Date;
@@ -10,5 +9,6 @@ export interface ScheduleEvent {
   waiting: number;
   price: number;
   color: string;
+  colIndex?: number;
+  totalCols?: number;
 }
-   

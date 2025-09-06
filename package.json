@@ -6,14 +6,25 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint . --write",
+    "format": "biome format .",
+    "format:write": "biome format . --write",
+    "check": "biome check .",
+    "check:fix": "biome check . --write",
+    "typecheck": "tsc --noEmit",
+    "validate:html": "html-validate index.html",
+    "quality": "pnpm run typecheck && pnpm run check && pnpm run validate:html"
   },
   "dependencies": {
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.2.3",
     "@types/node": "^22.14.0",
+    "html-validate": "^10.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
