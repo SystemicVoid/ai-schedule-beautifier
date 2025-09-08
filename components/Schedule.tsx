@@ -9,7 +9,7 @@ const CALENDAR_END_HOUR = 23;
 // Gap collapse configuration
 const GAP_MARKER_HEIGHT = 16; // pixels height for the collapsed gap marker
 const MIN_COLLAPSIBLE_GAP_MINUTES = 60; // collapse only gaps >= 60 minutes
-const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const daysOfWeek = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 // --- Helper Functions ---
 
