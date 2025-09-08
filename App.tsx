@@ -590,7 +590,10 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-100 min-h-screen p-4 sm:p-6 lg:p-8 font-sans">
-      <div id="schedule-to-print" className="bg-white p-4 rounded-lg shadow-md border border-slate-200">
+      <div
+        id="schedule-to-print"
+        className="bg-white p-4 rounded-lg shadow-md border border-slate-200"
+      >
         {currentWeekStart && (
           <Schedule
             events={currentWeekEvents}

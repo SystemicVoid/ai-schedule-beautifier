@@ -429,7 +429,6 @@ export const Schedule: React.FC<ScheduleProps> = ({
   }, [eventsByDay]);
 
   // Creation/editing interactions disabled for print-only display
-  const handleSlotClick = (_day: Date, _hour: number) => {};
 
   const handleModalClose = () => {
     setModalEvent(null);
@@ -477,10 +476,14 @@ export const Schedule: React.FC<ScheduleProps> = ({
         >
           {/* Grid background: visible sections with hour lines + collapsed gap markers */}
           <div className="absolute inset-0 flex flex-col">
-            {segments.map((seg, idx) => {
+            {segments.map((seg) => {
               if (seg.type === "gap") {
                 return (
-                  <div key={`gap-${idx}`} style={{ height: `${seg.height}px` }} className="flex items-center">
+                  <div
+                    key={`gap-${seg.start}-${seg.end}`}
+                    style={{ height: `${seg.height}px` }}
+                    className="flex items-center"
+                  >
                     <div className="w-full border-t border-dashed border-slate-300 relative">
                       <span className="absolute left-1/2 -translate-x-1/2 -top-2 text-slate-400 text-xs tracking-widest">
                         • • •
@@ -491,22 +494,33 @@ export const Schedule: React.FC<ScheduleProps> = ({
               }
 
               // Visible time segment: draw hour separators within this segment
-              const rows = [] as any[];
+              const rows: React.ReactNode[] = [];
               let p = seg.start;
               while (p < seg.end) {
                 const nextBoundary = Math.min(seg.end, Math.floor(p / 60) * 60 + 60);
                 const blockMin = Math.max(0, nextBoundary - p);
                 const h = (blockMin / 60) * HOUR_HEIGHT;
                 rows.push(
-                  <div key={`row-${idx}-${p}`} style={{ height: `${h}px` }} className="border-b border-slate-200" />
+                  <div
+                    key={`row-${seg.start}-${p}`}
+                    style={{ height: `${h}px` }}
+                    className="border-b border-slate-200"
+                  />
                 );
                 p = nextBoundary;
               }
 
               return (
-                <div key={`vis-${idx}`} style={{ height: `${seg.height}px` }} className="flex flex-col">
+                <div
+                  key={`vis-${seg.start}-${seg.end}`}
+                  style={{ height: `${seg.height}px` }}
+                  className="flex flex-col"
+                >
                   {rows.length === 0 ? (
-                    <div className="border-b border-slate-200" style={{ height: `${seg.height}px` }} />
+                    <div
+                      className="border-b border-slate-200"
+                      style={{ height: `${seg.height}px` }}
+                    />
                   ) : (
                     rows
                   )}
@@ -517,10 +531,7 @@ export const Schedule: React.FC<ScheduleProps> = ({
 
           {/* Day columns */}
           {visibleDayIndices.map((dayIndex) => (
-            <div
-              key={days[dayIndex].toISOString()}
-              className="relative border-r border-slate-200"
-            >
+            <div key={days[dayIndex].toISOString()} className="relative border-r border-slate-200">
               {/* Events for this day */}
               {(eventsByDay[dayIndex] || []).map((event) => {
                 const { top, height } = getEventPosition(event);
