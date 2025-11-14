@@ -544,7 +544,17 @@ export const Schedule: React.FC<ScheduleProps> = ({
                   <div
                     key={event.id}
                     style={{ top: `${top}px`, height: `${height}px`, width, left }}
-                    className={`absolute p-2 rounded-lg border text-xs overflow-hidden ${event.color}`}
+                    className={`absolute p-2 rounded-lg border text-xs overflow-hidden cursor-pointer transition-shadow hover:shadow-lg ${event.color}`}
+                    onClick={() => setModalEvent(event)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setModalEvent(event);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Edit ${event.title} event`}
                   >
                     <p className="font-bold truncate">{event.title}</p>
                     <p className="text-opacity-80">
